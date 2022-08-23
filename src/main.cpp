@@ -186,8 +186,8 @@ void startingSensors() {
     sensors.setCO2AltitudeOffset(cfg.altoffset);    // CO2 altitude compensation
     sensors.detectI2COnly(cfg.i2conly);             // force only i2c sensors
     sensors.setDebugMode(cfg.devmode);              // debugging mode 
-    sensors.init(cfg.getSensorType());              // start all sensors and
-                                                    // The UART sensor is choosed on Android app.
+    //sensors.init(cfg.getSensorType());              // start all sensors and
+    sensors.init(SENSORS::IKEAVK,PMS_RX,PMS_TX);                                              // The UART sensor is choosed on Android app.
                                                     // For more information about the supported sensors,
                                                     // please see the canairio_sensorlib documentation.
     if(sensors.getSensorsRegisteredCount()==0){
