@@ -18,6 +18,7 @@
 
 
 #ifdef LORADEVKIT
+//#ifdef ttgo_t_beam_v1
 #include "LMIC-node.h"
 #endif 
 
