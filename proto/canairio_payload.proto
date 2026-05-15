@@ -1,0 +1,37 @@
+// CanAirIO LoRaWAN payload schema
+// Replaces Cayenne LPP encoding for LORADEVKIT environment.
+//
+// All integer values are scaled to avoid floats on the wire:
+//   pm*, co2*, press, gas, nh3, co, batt : multiplied by 10
+//   temp, co2t                            : °C × 10  (sint32 for negatives)
+//   humi, co2h                            : % × 10
+//   volt                                  : V × 1000 (millivolts)
+//   alt                                   : meters   (sint32 for below sea level)
+//   heap                                  : bytes / 100
+//
+// Proto3 fields with value 0 are NOT encoded on the wire (saves LoRa bytes
+// when a sensor is absent/not detected).
+//
+// To regenerate the .pb.h / .pb.c files:
+//   protoc --nanopb_out=../lib/lorawan canairio_payload.proto
+//
+syntax = "proto3";
+
+message CanAirIOPayload {
+    uint32 pm1   = 1;   // PM1.0  µg/m³ × 10
+    uint32 pm25  = 2;   // PM2.5  µg/m³ × 10
+    uint32 pm10  = 3;   // PM10   µg/m³ × 10
+    uint32 co2   = 4;   // CO2    ppm × 10
+    uint32 co2h  = 5;   // CO2 sensor humidity  % × 10
+    sint32 co2t  = 6;   // CO2 sensor temp      °C × 10
+    sint32 temp  = 7;   // Main temperature     °C × 10
+    uint32 humi  = 8;   // Main humidity        % × 10
+    uint32 press = 9;   // Barometric pressure  hPa × 10
+    uint32 gas   = 10;  // Gas resistance       Ω × 10
+    uint32 nh3   = 11;  // Ammonia              ppm × 10
+    uint32 co    = 12;  // Carbon monoxide      ppm × 10
+    sint32 alt   = 13;  // Altitude             m
+    uint32 batt  = 14;  // Battery charge       % × 10
+    uint32 volt  = 15;  // Battery voltage      mV
+    uint32 heap  = 16;  // Free heap            bytes / 100
+}

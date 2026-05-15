@@ -5,7 +5,8 @@
 #include "functions.h"
 
 #include "Batterylib.hpp"
-#include <CayenneLPP.h>
+#include <pb_encode.h>
+#include "canairio_payload.pb.h"
 #include <Sensors.hpp>
 
 // Pin mapping
@@ -28,10 +29,8 @@ bool GO_DEEP_SLEEP = false;
 
 RTC_DATA_ATTR lmic_t RTC_LMIC;
 
-JsonDocument jsonBuffer;
-CayenneLPP lpp(160);
-//JsonObject root = jsonBuffer.to<JsonObject>();
-JsonObject LORA_DATA = jsonBuffer.to<JsonObject>();
+static uint8_t lora_buf[64];
+static size_t lora_buf_len = 0;
 
 void LoRaWANSetup()
 {
@@ -70,10 +69,10 @@ void LoraWANDo_send(osjob_t *j)
     } else {
         LoraWANGetData();
 
-        // Prepare upstream data transmission at the next possible time.  
-        //LMIC_setTxData2(1, LORA_DATA, sizeof(LORA_DATA)-1, 0);
-        LMIC_setTxData2(1, (lpp.getBuffer()), sizeof(lpp.getSize()), 0);
-        Serial.println(F("Packet queued"));
+        LMIC_setTxData2(1, lora_buf, lora_buf_len, 0);
+        Serial.print(F("Packet queued ("));
+        Serial.print(lora_buf_len);
+        Serial.println(F(" bytes)"));
     }
     // Next TX is scheduled after TX_COMPLETE event.
 }
@@ -239,38 +238,40 @@ void LoraWANDo(void)
 }
 
 void LoraWANGetData()
-{ 
+{
     float humi = sensors.getHumidity();
     if (humi == 0.0) humi = sensors.getCO2humi();
     float temp = sensors.getTemperature();
     if (temp == 0.0) temp = sensors.getCO2temp();
-    lpp.reset();
-    lpp.addGenericSensor(1,(sensors.getPM1()));
-    lpp.addGenericSensor(2,(sensors.getPM25()));
-    lpp.addGenericSensor(3,sensors.getPM10());
-    lpp.addGenericSensor(4,sensors.getCO2());
-    lpp.addGenericSensor(5,sensors.getCO2humi());
-    lpp.addGenericSensor(6,sensors.getCO2temp());
-    lpp.addTemperature(7,temp);
-    lpp.addRelativeHumidity(8,humi);
-    //lpp.addGPS(9,geo);
-    lpp.addBarometricPressure(10,(sensors.getPressure()));
-    lpp.addGenericSensor(11,(sensors.getGas()));
-    lpp.addGenericSensor(12,(sensors.getNH3()));
-    lpp.addGenericSensor(13,(sensors.getCO()));
-    lpp.addAltitude(14,(sensors.getAltitude()));
-    lpp.addGenericSensor(15,(battery.getCharge()));
-    lpp.addVoltage(16,(battery.getVoltage()));
-    //lpp.addGenericSensor(17,(WiFi.RSSI()));
-    lpp.addGenericSensor(18,(ESP.getFreeHeap()));
-    //lpp.addGenericSensor(19,(cfg.getStationName().c_str()));
-    //lpp.addGenericSensor(20,(cfg.getVersion()));
-    //lpp.addGenericSensor(21,(cfg.deviceId.c_str()));
-    
-    lpp.decodeTTN(lpp.getBuffer(), lpp.getSize(), LORA_DATA);
-    serializeJsonPretty(LORA_DATA, Serial);
-    
-    Serial.println();
+
+    CanAirIOPayload msg = CanAirIOPayload_init_zero;
+    msg.pm1   = (uint32_t)(sensors.getPM1()   * 10);
+    msg.pm25  = (uint32_t)(sensors.getPM25()  * 10);
+    msg.pm10  = (uint32_t)(sensors.getPM10()  * 10);
+    msg.co2   = (uint32_t)(sensors.getCO2()   * 10);
+    msg.co2h  = (uint32_t)(sensors.getCO2humi() * 10);
+    msg.co2t  = (int32_t) (sensors.getCO2temp() * 10);
+    msg.temp  = (int32_t) (temp  * 10);
+    msg.humi  = (uint32_t)(humi  * 10);
+    msg.press = (uint32_t)(sensors.getPressure() * 10);
+    msg.gas   = (uint32_t)(sensors.getGas()   * 10);
+    msg.nh3   = (uint32_t)(sensors.getNH3()   * 10);
+    msg.co    = (uint32_t)(sensors.getCO()    * 10);
+    msg.alt   = (int32_t) (sensors.getAltitude());
+    msg.batt  = (uint32_t)(battery.getCharge() * 10);
+    msg.volt  = (uint32_t)(battery.getVoltage() * 1000);
+    msg.heap  = (uint32_t)(ESP.getFreeHeap() / 100);
+
+    pb_ostream_t stream = pb_ostream_from_buffer(lora_buf, sizeof(lora_buf));
+    if (pb_encode(&stream, CanAirIOPayload_fields, &msg)) {
+        lora_buf_len = stream.bytes_written;
+        Serial.print(F("Encoded "));
+        Serial.print(lora_buf_len);
+        Serial.println(F(" bytes (protobuf)"));
+    } else {
+        Serial.println(F("pb_encode failed"));
+        lora_buf_len = 0;
+    }
 }
 
 void LoraWANSaveLMICToRTC(int deepsleep_sec)
