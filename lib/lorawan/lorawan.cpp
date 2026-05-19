@@ -29,7 +29,7 @@ bool GO_DEEP_SLEEP = false;
 
 RTC_DATA_ATTR lmic_t RTC_LMIC;
 
-static uint8_t lora_buf[64];
+static uint8_t lora_buf[128];
 static size_t lora_buf_len = 0;
 
 void LoRaWANSetup()
@@ -245,19 +245,58 @@ void LoraWANGetData()
     if (temp == 0.0) temp = sensors.getCO2temp();
 
     CanAirIOPayload msg = CanAirIOPayload_init_zero;
+
+    // Particulate Matter (µg/m³ × 10)
     msg.pm1   = (uint32_t)(sensors.getPM1()   * 10);
     msg.pm25  = (uint32_t)(sensors.getPM25()  * 10);
+    msg.pm4   = (uint32_t)(sensors.getPM4()   * 10);
     msg.pm10  = (uint32_t)(sensors.getPM10()  * 10);
+
+    // CO2 (ppm × 10, % × 10, °C × 10)
     msg.co2   = (uint32_t)(sensors.getCO2()   * 10);
     msg.co2h  = (uint32_t)(sensors.getCO2humi() * 10);
     msg.co2t  = (int32_t) (sensors.getCO2temp() * 10);
+
+    // Temperature & Humidity (°C × 10, % × 10)
     msg.temp  = (int32_t) (temp  * 10);
     msg.humi  = (uint32_t)(humi  * 10);
+
+    // Pressure & Altitude (hPa × 10, m)
     msg.press = (uint32_t)(sensors.getPressure() * 10);
-    msg.gas   = (uint32_t)(sensors.getGas()   * 10);
+    msg.alt   = (int32_t) (sensors.getAltitude());
+
+    // Gas Sensors (ppm × 10, kOhm × 100)
+    msg.gas   = (uint32_t)(sensors.getGas()   * 100);  // BME680: Ohm → kOhm × 100
     msg.nh3   = (uint32_t)(sensors.getNH3()   * 10);
     msg.co    = (uint32_t)(sensors.getCO()    * 10);
-    msg.alt   = (int32_t) (sensors.getAltitude());
+    msg.no2   = (uint32_t)(sensors.getNO2()   * 10);
+    msg.o3    = (uint32_t)(sensors.getO3()    * 10);
+
+    // VOC/NOX Indices (0-500 × 10)
+    msg.voc   = (uint32_t)(sensors.getUnitValue(UNIT::VOC)   * 10);
+    msg.nox   = (uint32_t)(sensors.getUnitValue(UNIT::NOX)   * 10);
+    msg.voci  = (uint32_t)(sensors.getUnitValue(UNIT::VOCI)  * 10);
+    msg.noxi  = (uint32_t)(sensors.getUnitValue(UNIT::NOXI)  * 10);
+
+    // Radiation (CPM direct, µSv/h × 100)
+    msg.cpm   = (uint32_t)(sensors.getGeigerCPM());
+    msg.rad   = (uint32_t)(sensors.getGeigerMicroSievertHour() * 100);
+
+    // Noise Sensor (dB × 10) - only if supported
+    #if defined(CSL_NOISE_SENSOR_SUPPORTED)
+    msg.noise = (uint32_t)(sensors.getNoise() * 10);
+    msg.noiseAvg = (uint32_t)(sensors.getNoiseAverage() * 10);
+    msg.noisePeak = (uint32_t)(sensors.getNoisePeak() * 10);
+    msg.noiseMin = (uint32_t)(sensors.getNoiseMin() * 10);
+    msg.noiseLegal = (uint32_t)(sensors.getNoiseLegalAverage() * 10);
+    msg.noiseLegalMax = (uint32_t)(sensors.getNoiseLegalMaximum() * 10);
+    msg.noiseLd = (uint32_t)(sensors.getNoiseLd() * 10);
+    msg.noiseLe = (uint32_t)(sensors.getNoiseLe() * 10);
+    msg.noiseLn = (uint32_t)(sensors.getNoiseLn() * 10);
+    msg.noiseLden = (uint32_t)(sensors.getNoiseLden() * 10);
+    #endif
+
+    // Battery & System
     msg.batt  = (uint32_t)(battery.getCharge() * 10);
     msg.volt  = (uint32_t)(battery.getVoltage() * 1000);
     msg.heap  = (uint32_t)(ESP.getFreeHeap() / 100);

@@ -1,37 +1,73 @@
-// CanAirIO LoRaWAN payload schema
-// Replaces Cayenne LPP encoding for LORADEVKIT environment.
+// CanAirIO LoRaWAN payload schema - Comprehensive sensor support
+// Supports all available sensors: PM, CO2, temperature, humidity, pressure,
+// altitude, gases (NH3, CO, NO2, O3, VOC, NOX), radiation (Geiger), and noise.
 //
 // All integer values are scaled to avoid floats on the wire:
-//   pm*, co2*, press, gas, nh3, co, batt : multiplied by 10
-//   temp, co2t                            : °C × 10  (sint32 for negatives)
-//   humi, co2h                            : % × 10
-//   volt                                  : V × 1000 (millivolts)
-//   alt                                   : meters   (sint32 for below sea level)
-//   heap                                  : bytes / 100
+//   pm*, co2, nh3, co, no2, o3, voc, nox, voci, noxi  : ×10
+//   co2t, co2h, temp, humi, press, gas, rad, noise*  : see field comments
+//   cpm                                                : direct value
+//   alt                                                : meters (sint32)
+//   volt                                               : millivolts
+//   batt                                               : % × 10
+//   heap                                               : bytes / 100
 //
-// Proto3 fields with value 0 are NOT encoded on the wire (saves LoRa bytes
-// when a sensor is absent/not detected).
-//
-// To regenerate the .pb.h / .pb.c files:
-//   protoc --nanopb_out=../lib/lorawan canairio_payload.proto
+// Proto3 fields with value 0 are NOT encoded on the wire, saving LoRa bytes
+// when a sensor is absent/not detected (proto3 optimization).
 //
 syntax = "proto3";
 
 message CanAirIOPayload {
+    // ===== Particulate Matter (µg/m³ × 10) =====
     uint32 pm1   = 1;   // PM1.0  µg/m³ × 10
     uint32 pm25  = 2;   // PM2.5  µg/m³ × 10
-    uint32 pm10  = 3;   // PM10   µg/m³ × 10
-    uint32 co2   = 4;   // CO2    ppm × 10
-    uint32 co2h  = 5;   // CO2 sensor humidity  % × 10
-    sint32 co2t  = 6;   // CO2 sensor temp      °C × 10
-    sint32 temp  = 7;   // Main temperature     °C × 10
-    uint32 humi  = 8;   // Main humidity        % × 10
-    uint32 press = 9;   // Barometric pressure  hPa × 10
-    uint32 gas   = 10;  // Gas resistance       Ω × 10
-    uint32 nh3   = 11;  // Ammonia              ppm × 10
-    uint32 co    = 12;  // Carbon monoxide      ppm × 10
-    sint32 alt   = 13;  // Altitude             m
-    uint32 batt  = 14;  // Battery charge       % × 10
-    uint32 volt  = 15;  // Battery voltage      mV
-    uint32 heap  = 16;  // Free heap            bytes / 100
+    uint32 pm4   = 3;   // PM4.0  µg/m³ × 10
+    uint32 pm10  = 4;   // PM10   µg/m³ × 10
+
+    // ===== CO2 & CO2 Sensor =====
+    uint32 co2   = 5;   // CO2    ppm × 10
+    uint32 co2h  = 6;   // CO2 sensor humidity  % × 10
+    sint32 co2t  = 7;   // CO2 sensor temp      °C × 10 (ZigZag encoded)
+
+    // ===== Main Temperature & Humidity =====
+    sint32 temp  = 8;   // Temperature          °C × 10 (ZigZag encoded)
+    uint32 humi  = 9;   // Humidity             % × 10
+
+    // ===== Pressure & Altitude =====
+    uint32 press = 10;  // Barometric pressure  hPa × 10
+    sint32 alt   = 11;  // Altitude             m (ZigZag encoded)
+
+    // ===== Gas Sensors (Chemical) =====
+    uint32 gas   = 12;  // Gas resistance (BME680)  kOhm × 100
+    uint32 nh3   = 13;  // Ammonia (SEN0469)    ppm × 10
+    uint32 co    = 14;  // Carbon monoxide (SEN0466)  ppm × 10
+    uint32 no2   = 15;  // Nitrogen dioxide (SEN0471) ppm × 10
+    uint32 o3    = 16;  // Ozone (SEN0472)      ppm × 10
+
+    // ===== VOC/NOX Indices =====
+    uint32 voc   = 17;  // VOC index (generic)  0-500 × 10
+    uint32 nox   = 18;  // NOX index (generic)  0-500 × 10
+    uint32 voci  = 19;  // VOC index (SGP41)    0-500 × 10
+    uint32 noxi  = 20;  // NOX index (SGP41)    0-500 × 10
+
+    // ===== Radiation (Geiger) =====
+    uint32 cpm   = 21;  // Counts per minute    direct value
+    uint32 rad   = 22;  // Dose equivalent      µSv/h × 100
+
+    // ===== Noise Sensor (dB × 10) =====
+    uint32 noise = 23;  // Instantaneous noise  dB × 10
+    uint32 noiseAvg = 24;        // Average noise           dB × 10
+    uint32 noisePeak = 25;       // Peak noise              dB × 10
+    uint32 noiseMin = 26;        // Minimum noise           dB × 10
+    uint32 noiseLegal = 27;      // Legal average noise     dB × 10
+    uint32 noiseLegalMax = 28;   // Legal maximum noise     dB × 10
+    uint32 noiseLd = 29;         // Index Ld (day)          dB × 10
+    uint32 noiseLe = 30;         // Index Le (evening)      dB × 10
+    uint32 noiseLn = 31;         // Index Ln (night)        dB × 10
+    uint32 noiseLden = 32;       // Index Lden (day-eve-night) dB × 10
+
+    // ===== Battery & System =====
+    uint32 batt  = 33;  // Battery charge       % × 10
+    uint32 volt  = 34;  // Battery voltage      mV
+    uint32 heap  = 35;  // Free heap memory     bytes / 100
 }
+
